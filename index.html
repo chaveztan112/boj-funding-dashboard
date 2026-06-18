@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BOJ Hike Funding Monitor — Live</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e17; --panel:#121826; --panel2:#0e1320; --line:#1f2a3d;
+    --txt:#dfe7f5; --mut:#8595af; --accent:#56b6f0; --jpy:#f0617c; --usd:#56b6f0; --sgd:#5fd0a0;
+    --warn:#f5b942; --bad:#f0617c; --good:#5fd0a0; --grid:#1a2336;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  .wrap{max-width:1280px;margin:0 auto;padding:20px 22px 64px}
+  .eyebrow{letter-spacing:.18em;text-transform:uppercase;font-size:11px;color:var(--mut)}
+  h1{margin:4px 0 6px;font-size:26px;font-weight:700}
+  h2{font-size:15px;margin:0 0 2px;font-weight:650}
+  .sub{color:var(--mut);font-size:13px;margin:0 0 18px}
+  .banner{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#161d2e,#10182a);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:14px 0 10px}
+  .srcbar{display:flex;align-items:center;gap:12px;margin:0 0 18px;flex-wrap:wrap}
+  .pill{font-size:12px;font-weight:650;padding:4px 11px;border-radius:999px;border:1px solid}
+  .pill.supportive{color:var(--good);border-color:#1f5b45;background:#0e2a20}
+  .pill.watch{color:var(--warn);border-color:#5b4a1f;background:#2a230e}
+  .pill.stress{color:var(--bad);border-color:#5b1f2c;background:#2a0e16}
+  .grid{display:grid;gap:16px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:1.3fr 1fr}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:980px){.g3,.g2,.g4{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card.tight{padding:14px 16px}
+  .kpi{font-size:30px;font-weight:720;letter-spacing:-.5px}
+  .lab{color:var(--mut);font-size:12px;margin-top:2px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--grid)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .flag{font-size:11px;font-weight:650;padding:2px 7px;border-radius:6px}
+  .f-low{color:var(--good);background:#0e2a20}
+  .f-watch{color:var(--warn);background:#2a230e}
+  .f-stress{color:var(--bad);background:#2a0e16}
+  .controls{position:sticky;top:0;z-index:5;background:rgba(10,14,23,.92);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:18px}
+  .ctl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  @media(max-width:980px){.ctl-grid{grid-template-columns:1fr 1fr}}
+  .ctl label{display:block;font-size:12px;color:var(--mut);margin-bottom:6px}
+  .ctl .val{color:var(--txt);font-weight:650}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{background:var(--panel2);color:var(--mut);border:0;padding:5px 10px;font-size:12px;cursor:pointer}
+  .seg button.on{background:var(--accent);color:#06121f;font-weight:650}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px solid var(--grid)}
+  .row:last-child{border-bottom:0}
+  .row .v{font-weight:650}
+  .mut{color:var(--mut)}
+  .chartbox{position:relative;height:230px}
+  .chartbox.tall{height:260px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .note{font-size:11.5px;color:var(--mut);margin-top:10px;line-height:1.5}
+  .sec-title{display:flex;align-items:center;gap:10px;margin:26px 0 12px}
+  .sec-title h2{font-size:18px}
+  .sec-title .ln{flex:1;height:1px;background:var(--line)}
+  .gauge-wrap{display:flex;align-items:center;gap:18px}
+  .gnum{font-size:38px;font-weight:760;letter-spacing:-1px}
+  .footer{color:var(--mut);font-size:11.5px;margin-top:34px;border-top:1px solid var(--line);padding-top:14px;line-height:1.7}
+  .tag{display:inline-block;font-size:10px;color:var(--mut);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-left:6px}
+  .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">STIRT · Repo · FX Funding control room</div>
+  <h1>BOJ Hike Funding Monitor <span class="tag">Live feed</span></h1>
+  <p class="sub">Carry compression, FX-swap funding, cross-currency basis, OIS curves & CLP-style unwind risk across JPY / USD / SGD and G10 — anchored to the 16 Jun 2026 BOJ hike to 1.00%, with live spot &amp; realized-vol from Yahoo.</p>
+
+  <div class="banner">
+    <span id="regimePill" class="pill supportive">Carry Supportive · Watch</span>
+    <span class="mut" id="bannerTxt">BOJ 1.00% (+25bp, 16 Jun) · Fed 3.50–3.75% (hold) · funding leg tightening, positioning crowded near MoF intervention.</span>
+  </div>
+  <div class="srcbar">
+    <span id="srcBadge" class="pill watch"><span class="live-dot" style="background:var(--warn)"></span>Connecting…</span>
+    <span class="mut" id="srcTime">Requesting live quotes from Yahoo…</span>
+    <button class="btn" id="liveBtn">Refresh live data</button>
+  </div>
+
+  <!-- SCENARIO CONTROLS -->
+  <div class="controls">
+    <div class="ctl-grid">
+      <div class="ctl">
+        <label>BOJ terminal rate <span class="val" id="bojVal">1.00%</span></label>
+        <input type="range" id="boj" min="1.00" max="2.00" step="0.25" value="1.00" />
+        <div class="mut" style="font-size:11px">Next-hike path priced into JPY OIS</div>
+      </div>
+      <div class="ctl">
+        <label>Fed funds (mid) <span class="val" id="fedVal">3.63%</span></label>
+        <input type="range" id="fed" min="3.00" max="4.25" step="0.125" value="3.625" />
+        <div class="mut" style="font-size:11px">Drives USD leg & SGD pass-through</div>
+      </div>
+      <div class="ctl">
+        <label>USD/JPY spot <span class="val" id="fxVal">160.2</span></label>
+        <input type="range" id="fx" min="150" max="166" step="0.2" value="160.2" />
+        <div class="mut" style="font-size:11px">156 ≈ unwind zone · 162+ ≈ MoF risk</div>
+      </div>
+      <div class="ctl">
+        <label>Volatility regime</label>
+        <div class="seg" id="volSeg">
+          <button data-v="0.9" class="">Calm</button>
+          <button data-v="1.0" class="on">Elevated</button>
+          <button data-v="1.35">Stress</button>
+        </div>
+        <div style="margin-top:8px"><button class="btn" id="resetBtn">Reset to live</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="grid g4" style="margin-bottom:4px">
+    <div class="card tight"><div class="kpi" id="kCarry">2.21%</div><div class="lab">Net funded carry · long USD/JPY 3M</div></div>
+    <div class="card tight"><div class="kpi" id="kBasis">−38 bp</div><div class="lab">USD/JPY 3M cross-ccy basis</div></div>
+    <div class="card tight"><div class="kpi" id="kBreak">159.3</div><div class="lab">3M carry breakeven (spot)</div></div>
+    <div class="card tight"><div class="kpi" id="kClp">3.1</div><div class="lab">CLP unwind pressure <span class="tag" id="clpRegime">Watch</span></div></div>
+  </div>
+
+  <!-- CORE: curves + carry decomp -->
+  <div class="sec-title"><h2>Funding & rate curves</h2><div class="ln"></div></div>
+  <div class="grid g2">
+    <div class="card">
+      <h2>OIS curves — JPY · USD · SGD <span class="tag">1M → 10Y</span></h2>
+      <p class="note" style="margin:2px 0 6px">Overnight-indexed swap curves (TONA / SOFR / SORA-OIS). Front ends move with the BOJ &amp; Fed sliders; the spread between USD and JPY is the carry engine.</p>
+      <div class="chartbox tall"><canvas id="curveChart"></canvas></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--usd)"></span>USD (SOFR-OIS)</span>
+        <span><span class="dot" style="background:var(--jpy)"></span>JPY (TONA-OIS)</span>
+        <span><span class="dot" style="background:var(--sgd)"></span>SGD (SORA-OIS)</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Carry decomposition — long USD/JPY</h2>
+      <p class="note" style="margin:2px 0 6px">Where the 3M carry comes from, net of the cost of funding yen synthetically via FX swap.</p>
+      <div class="chartbox"><canvas id="carryChart"></canvas></div>
+      <div id="carryRows" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- CLP + VOL -->
+  <div class="sec-title"><h2>Unwind risk — CLP &amp; volatility</h2><div class="ln"></div></div>
+  <div class="grid g3">
+    <div class="card">
+      <h2>CLP composite liquidation pressure</h2>
+      <div class="gauge-wrap" style="margin:10px 0 6px">
+        <div class="gnum" id="clpBig" style="color:var(--warn)">3.1</div>
+        <div>
+          <div id="clpRegime2" style="font-weight:650;color:var(--warn)">Watch</div>
+          <div class="mut" style="font-size:12px">0–2 Normal · 2–4 Watch · 4–6 Stress · 6–8 High · 8+ Critical</div>
+        </div>
+      </div>
+      <div id="clpComp"></div>
+      <p class="note">CLP rises as carry cushion thins (BOJ hikes), spot nears the unwind zone, positioning stays crowded, or vol/funding stress builds.</p>
+    </div>
+    <div class="card">
+      <h2>CLP stress path — BOJ terminal scenarios</h2>
+      <div class="chartbox"><canvas id="stressChart"></canvas></div>
+      <p class="note">Modeled CLP if the BOJ takes the policy rate to each terminal level, holding spot &amp; vol at current slider values.</p>
+    </div>
+    <div class="card">
+      <h2>Volatility &amp; positioning</h2>
+      <div id="volRows"></div>
+      <div class="chartbox" style="height:150px;margin-top:6px"><canvas id="volChart"></canvas></div>
+      <p class="note">Implied-vol base uses Yahoo realized vol when live; scales with the regime toggle and proximity to intervention. Positioning z reflects crowded spec longs in USD/JPY.</p>
+    </div>
+  </div>
+
+  <!-- G10 grid -->
+  <div class="sec-title"><h2>G10 + SGD carry &amp; unwind grid</h2><div class="ln"></div></div>
+  <div class="card">
+    <p class="note" style="margin-top:0">Front-end rate vs USD, net carry of the long-USD trade, positioning, and CLP-style unwind flag. Sorted by unwind risk.</p>
+    <table id="g10tbl">
+      <thead><tr><th>Pair</th><th>Policy rate</th><th>Rate diff vs USD</th><th>Net carry 3M</th><th>Basis (bp)</th><th>Pos z</th><th>CLP</th><th>Regime</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- SGD transmission -->
+  <div class="sec-title"><h2>SGD transmission — the MAS channel</h2><div class="ln"></div></div>
+  <div class="grid g2">
+    <div class="card">
+      <h2>How the BOJ hike reaches SGD rates</h2>
+      <p class="note" style="margin-top:2px">MAS targets the S$NEER slope, not a rate — so SORA is largely <i>imported</i> from USD funding via covered parity. A BOJ hike matters indirectly: it firms broad Asia funding and lifts USD/JPY-driven hedging demand. The dominant SGD driver remains the USD leg and the NEER slope.</p>
+      <div id="sgdRows"></div>
+    </div>
+    <div class="card">
+      <h2>SORA &amp; USD/SGD response</h2>
+      <div class="chartbox"><canvas id="sgdChart"></canvas></div>
+      <p class="note">Modeled 3M-SORA sensitivity: β≈0.6 to the USD front end, less the S$NEER appreciation drag. USD/SGD anchor uses live Yahoo when available.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <b>Live + model dashboard.</b> <b>USD/JPY and USD/SGD spot and realized vol are pulled live from Yahoo Finance</b> (server-side via <code>/api/quotes</code>, cached ~15 min); if the feed is unavailable the page falls back to anchored June 2026 levels and shows a "Modeled fallback" badge. Policy rates (BOJ 1.00%, Fed 3.50–3.75%, ECB 2.25%, SORA) are anchored constants — Yahoo doesn't carry them; wire FRED into the same function to make them live too. Cross-currency basis, FX-swap-implied funding, OIS curve shapes, positioning z-scores and the CLP score are transparent modeled proxies recomputed from the sliders. CLP/vol scoring follows the structure of the reference carry-monitor. Built 18 Jun 2026 for interview prep. Verify every number against your desk's marks before quoting it.
+  </div>
+</div>
+
+<script>
+// ---------- ANCHOR DATA (verified June 2026; spot/vol overwritten by live feed) ----------
+const LIVE = { boj:1.00, fed:3.625, fx:160.2, vol:1.0 };
+const FX_UNWIND=156, FX_MOF=162;
+let baseSORA=1.17;
+let REALIZED_VOL=null;        // annualized % from Yahoo, when live
+let USDSGD_ANCHOR=1.292;      // overwritten by live feed
+let US10Y_LIVE=null;          // FRED DGS10, when live
+
+const G10 = [
+  {ccy:'JPY', label:'USD/JPY', rate:()=>S.boj, posz:2.4, basis:-38, dir:1},
+  {ccy:'CHF', label:'USD/CHF', rate:()=>0.75, posz:1.6, basis:-22, dir:1},
+  {ccy:'EUR', label:'EUR/USD', rate:()=>2.25, posz:0.7, basis:-12, dir:-1},
+  {ccy:'GBP', label:'GBP/USD', rate:()=>4.00, posz:0.5, basis:-8,  dir:-1},
+  {ccy:'SGD', label:'USD/SGD', rate:()=>baseSORA, posz:1.1, basis:-15, dir:1},
+  {ccy:'AUD', label:'AUD/USD', rate:()=>3.85, posz:1.2, basis:-6,  dir:-1},
+  {ccy:'CAD', label:'USD/CAD', rate:()=>2.75, posz:0.6, basis:-9,  dir:1},
+  {ccy:'NZD', label:'NZD/USD', rate:()=>3.25, posz:0.9, basis:-7,  dir:-1},
+];
+
+let S = {...LIVE};
+
+// ---------- CURVE MODEL ----------
+const TENORS=['1M','3M','6M','1Y','2Y','5Y','10Y'];
+const TX=[1/12,0.25,0.5,1,2,5,10];
+function curve(front, hikesPriced, termPrem){
+  return TX.map(t=>{
+    const hk = hikesPriced*(1-Math.exp(-t/1.3));
+    const tp = termPrem*(t/10);
+    return +(front + hk + tp).toFixed(3);
+  });
+}
+function usdCurve(){ const tp=(US10Y_LIVE!=null)?(US10Y_LIVE-S.fed-0.18):0.45; return curve(S.fed, 0.18, tp); }
+function jpyCurve(){ const priced = 0.25 + (S.boj-1.0)*0.55; return curve(S.boj, priced, 0.65); }
+function sgdCurve(){ const front = baseSORA + (S.fed-LIVE.fed)*0.55; return curve(front, 0.20, 0.70); }
+
+// ---------- CARRY MODEL ----------
+function carry(){
+  const u = usdCurve()[1];
+  const j = jpyCurve()[1];
+  const grossDiff = u - j;
+  const basis = -(38 + (S.boj-1.0)*18 + (S.vol-1)*40)/100;
+  const net = grossDiff + basis;
+  const carry3m = net/4;
+  const breakeven = S.fx*(1 - carry3m/100);
+  return {u,j,grossDiff,basis,net,carry3m,breakeven};
+}
+
+// ---------- CLP / VOL MODEL ----------
+function volProxy(){
+  const baseV = (REALIZED_VOL || 9.5);
+  const prox = Math.max(0,(S.fx-158))/(FX_MOF-158);
+  return +(baseV*S.vol*(1+0.25*prox)).toFixed(1);
+}
+function clp(bojRate, fx, vol){
+  const u = curve(S.fed,0.18,0.45)[1];
+  const priced = 0.25 + (bojRate-1.0)*0.55;
+  const j = curve(bojRate, priced, 0.65)[1];
+  const basis = -(38 + (bojRate-1.0)*18 + (vol-1)*40)/100;
+  const net = (u-j)+basis;
+  const carryCushion = Math.max(0, net);
+  const spotStress = Math.max(0,(159-fx))/3;
+  const positioning = 2.4;
+  const volStress = (vol-0.9)*3.2;
+  let c = 1.0 + 1.15*positioning*0.7 + 1.4*spotStress + 1.1*volStress + 0.9*(2.6-carryCushion);
+  return {clp:+Math.max(0,c).toFixed(2), positioning, spotStress, volStress, carryCushion:+carryCushion.toFixed(2)};
+}
+function regimeOf(c){
+  if(c<2) return ['Normal','supportive','var(--good)'];
+  if(c<4) return ['Watch','watch','var(--warn)'];
+  if(c<6) return ['Stress','stress','var(--bad)'];
+  if(c<8) return ['High Risk','stress','var(--bad)'];
+  return ['Critical','stress','var(--bad)'];
+}
+
+// ---------- SGD MODEL ----------
+function sgd(){
+  const fedDelta = S.fed - LIVE.fed;
+  const sora3m = baseSORA + 0.6*fedDelta - 0.12;
+  const usdsgd = USDSGD_ANCHOR + 0.018*fedDelta - (S.boj-1.0)*0.004;
+  return {sora3m:+sora3m.toFixed(2), usdsgd:+usdsgd.toFixed(3), fedDelta};
+}
+
+// ---------- CHARTS ----------
+const gridC='#1a2336', tickC='#8595af';
+const baseOpts=(yTitle)=>({
+  responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+  scales:{
+    x:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}},
+    y:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}},title:{display:!!yTitle,text:yTitle,color:tickC}}
+  }
+});
+let curveChart,carryChart,stressChart,volChart,sgdChart;
+
+function initCharts(){
+  curveChart=new Chart(document.getElementById('curveChart'),{
+    type:'line',
+    data:{labels:TENORS,datasets:[
+      {label:'USD',data:usdCurve(),borderColor:'#56b6f0',backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:2},
+      {label:'JPY',data:jpyCurve(),borderColor:'#f0617c',backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:2},
+      {label:'SGD',data:sgdCurve(),borderColor:'#5fd0a0',backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:2},
+    ]},options:baseOpts('Rate %')
+  });
+  carryChart=new Chart(document.getElementById('carryChart'),{
+    type:'bar',
+    data:{labels:['USD 3M','JPY 3M','Basis','Net carry'],datasets:[{data:[0,0,0,0],backgroundColor:['#56b6f0','#f0617c','#f5b942','#5fd0a0']}]},
+    options:{...baseOpts('%'),plugins:{legend:{display:false}}}
+  });
+  stressChart=new Chart(document.getElementById('stressChart'),{
+    type:'line',
+    data:{labels:['1.00','1.25','1.50','1.75','2.00'],datasets:[{label:'CLP',data:[0,0,0,0,0],borderColor:'#f5b942',backgroundColor:'rgba(245,185,66,.12)',fill:true,tension:.3,pointRadius:3}]},
+    options:{...baseOpts('CLP'),plugins:{legend:{display:false}}}
+  });
+  volChart=new Chart(document.getElementById('volChart'),{
+    type:'bar',
+    data:{labels:['Impl vol','Pos z','Vol stress'],datasets:[{data:[0,0,0],backgroundColor:['#56b6f0','#f0617c','#f5b942']}]},
+    options:{...baseOpts(''),plugins:{legend:{display:false}}}
+  });
+  sgdChart=new Chart(document.getElementById('sgdChart'),{
+    type:'bar',
+    data:{labels:['SORA 3M %','USD/SGD'],datasets:[
+      {label:'Scenario',data:[0,0],backgroundColor:'#5fd0a0'},
+      {label:'Live',data:[0,0],backgroundColor:'#33415c'}
+    ]},
+    options:{...baseOpts(''),plugins:{legend:{display:true,labels:{color:tickC,boxWidth:10,font:{size:11}}}}}
+  });
+}
+
+// ---------- RENDER ----------
+function fmtBp(x){return (x>=0?'+':'−')+Math.abs(Math.round(x))+' bp';}
+function rowHtml(k,v){return `<div class="row"><span class="mut">${k}</span><span class="v">${v}</span></div>`;}
+function render(){
+  const c=carry();
+  const v=volProxy();
+  const base=clp(S.boj,S.fx,S.vol);
+  const [rname,rcls,rcol]=regimeOf(base.clp);
+
+  document.getElementById('kCarry').textContent=c.net.toFixed(2)+'%';
+  document.getElementById('kBasis').textContent=fmtBp(c.basis*100);
+  document.getElementById('kBreak').textContent=c.breakeven.toFixed(1);
+  document.getElementById('kClp').textContent=base.clp.toFixed(1);
+  document.getElementById('clpRegime').textContent=rname;
+  document.getElementById('clpBig').textContent=base.clp.toFixed(1);
+  document.getElementById('clpBig').style.color=rcol;
+  document.getElementById('clpRegime2').textContent=rname;
+  document.getElementById('clpRegime2').style.color=rcol;
+
+  const pill=document.getElementById('regimePill');
+  pill.className='pill '+rcls;
+  pill.textContent=(c.net>0?'Carry Supportive':'Carry Negative')+' · '+rname;
+  document.getElementById('bannerTxt').innerHTML=
+    `BOJ ${S.boj.toFixed(2)}% · Fed ${S.fed.toFixed(3)}% · USD/JPY <b style="color:var(--txt)">${S.fx.toFixed(1)}</b> · net carry ${c.net.toFixed(2)}% · CLP ${base.clp.toFixed(1)} (${rname}).`;
+
+  curveChart.data.datasets[0].data=usdCurve();
+  curveChart.data.datasets[1].data=jpyCurve();
+  curveChart.data.datasets[2].data=sgdCurve();
+  curveChart.update();
+
+  carryChart.data.datasets[0].data=[c.u,-c.j,c.basis,c.net];
+  carryChart.update();
+  document.getElementById('carryRows').innerHTML=
+    rowHtml('USD 3M OIS',c.u.toFixed(2)+'%')+
+    rowHtml('− JPY 3M OIS',c.j.toFixed(2)+'%')+
+    rowHtml('Rate differential',c.grossDiff.toFixed(2)+'%')+
+    rowHtml('Cross-ccy basis',fmtBp(c.basis*100))+
+    rowHtml('<b>Net funded carry (3M ann.)</b>','<b>'+c.net.toFixed(2)+'%</b>')+
+    rowHtml('Breakeven spot (3M)',c.breakeven.toFixed(1));
+
+  document.getElementById('clpComp').innerHTML=
+    rowHtml('Positioning (z)',base.positioning.toFixed(2))+
+    rowHtml('Spot stress',base.spotStress.toFixed(2))+
+    rowHtml('Vol stress',base.volStress.toFixed(2))+
+    rowHtml('Carry cushion',base.carryCushion.toFixed(2)+'%');
+
+  stressChart.data.datasets[0].data=[1.00,1.25,1.50,1.75,2.00].map(b=>clp(b,S.fx,S.vol).clp);
+  stressChart.update();
+
+  document.getElementById('volRows').innerHTML=
+    rowHtml('Implied / realized vol',v.toFixed(1)+' %'+(REALIZED_VOL?' (live)':''))+
+    rowHtml('Positioning z-score','2.40')+
+    rowHtml('Spot vs unwind zone',(S.fx-FX_UNWIND).toFixed(1)+' big figs')+
+    rowHtml('Regime',S.vol<1?'Calm':S.vol>1.2?'Stress':'Elevated');
+  volChart.data.datasets[0].data=[v,2.4*3,base.volStress*3];
+  volChart.update();
+
+  const u3=usdCurve()[1];
+  const rows=G10.map(g=>{
+    const rate=g.rate();
+    const rawDiff=u3-rate;
+    const net=(rawDiff) + g.basis/100;
+    const cl=clpForPair(rate,g.posz);
+    const [rn,,]=regimeOf(cl);
+    return {g,rate,rawDiff,net,cl,rn};
+  }).sort((a,b)=>b.cl-a.cl);
+  document.querySelector('#g10tbl tbody').innerHTML=rows.map(r=>{
+    const fl=r.cl<2?'f-low':r.cl<4?'f-watch':'f-stress';
+    return `<tr><td>${r.g.label}</td><td>${r.rate.toFixed(2)}%</td><td>${r.rawDiff>=0?'+':''}${r.rawDiff.toFixed(2)}%</td><td>${r.net.toFixed(2)}%</td><td>${r.g.basis}</td><td>${r.g.posz.toFixed(1)}</td><td>${r.cl.toFixed(2)}</td><td><span class="flag ${fl}">${r.rn}</span></td></tr>`;
+  }).join('');
+
+  const sg=sgd();
+  document.getElementById('sgdRows').innerHTML=
+    rowHtml('USD front-end (3M)',u3.toFixed(2)+'%')+
+    rowHtml('Pass-through β to SORA','0.60')+
+    rowHtml('S$NEER slope drag','−12 bp')+
+    rowHtml('<b>Modeled 3M SORA</b>','<b>'+sg.sora3m.toFixed(2)+'%</b>')+
+    rowHtml('Modeled USD/SGD',sg.usdsgd.toFixed(3))+
+    rowHtml('BOJ-hike indirect effect','+ Asia funding firmness');
+  sgdChart.data.datasets[0].data=[sg.sora3m, sg.usdsgd];
+  sgdChart.data.datasets[1].data=[baseSORA, USDSGD_ANCHOR];
+  sgdChart.update();
+}
+function clpForPair(rate,posz){
+  const u=usdCurve()[1];
+  const net=(u-rate);
+  const cushion=Math.max(0,net);
+  let c=1.0 + 1.15*posz*0.7 + 1.1*(S.vol-0.9)*3.2*0.4 + 0.9*Math.max(0,(2.6-cushion));
+  return +Math.max(0,c).toFixed(2);
+}
+
+// ---------- LIVE FEED ----------
+async function loadLive(){
+  const badge=document.getElementById('srcBadge');
+  const time=document.getElementById('srcTime');
+  badge.innerHTML='<span class="live-dot" style="background:var(--warn)"></span>Connecting…';
+  badge.className='pill watch';
+  try{
+    const r=await fetch('/api/quotes',{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(d.usdjpy&&d.usdjpy.spot){
+      LIVE.fx=+(+d.usdjpy.spot).toFixed(1); S.fx=LIVE.fx;
+      const fxEl=document.getElementById('fx');
+      fxEl.value=Math.min(166,Math.max(150,S.fx));
+      document.getElementById('fxVal').textContent=S.fx.toFixed(1);
+    }
+    if(d.usdjpy&&d.usdjpy.vol){ REALIZED_VOL=+d.usdjpy.vol; }
+    if(d.usdsgd&&d.usdsgd.spot){ USDSGD_ANCHOR=+(+d.usdsgd.spot).toFixed(3); }
+    let ratesLive=false;
+    if(d.rates && !d.rates.error && d.rates.fedFunds!=null){
+      LIVE.fed=+(+d.rates.fedFunds).toFixed(3); S.fed=LIVE.fed;
+      const fedEl=document.getElementById('fed');
+      fedEl.value=Math.min(4.25,Math.max(3.00,S.fed));
+      document.getElementById('fedVal').textContent=S.fed.toFixed(2)+'%';
+      if(d.rates.us10y!=null) US10Y_LIVE=+d.rates.us10y;
+      ratesLive=true;
+    }
+    badge.innerHTML='<span class="live-dot" style="background:var(--good)"></span>Live · Yahoo';
+    badge.className='pill supportive';
+    const when=d.asof?new Date(d.asof):new Date();
+    time.innerHTML='Refreshed '+when.toLocaleString()+' · USD/JPY <b style="color:var(--txt)">'+LIVE.fx.toFixed(1)+'</b>'+
+      (d.usdsgd&&d.usdsgd.spot?' · USD/SGD <b style="color:var(--txt)">'+USDSGD_ANCHOR.toFixed(3)+'</b>':'')+
+      (REALIZED_VOL?' · vol '+REALIZED_VOL.toFixed(1)+'%':'')+
+      (ratesLive?' · Fed '+LIVE.fed.toFixed(2)+'% <span class="mut">(FRED)</span>':' · rates anchored');
+    badge.innerHTML='<span class="live-dot" style="background:var(--good)"></span>Live · Yahoo'+(ratesLive?' + FRED':'');
+    render();
+  }catch(e){
+    badge.innerHTML='<span class="live-dot" style="background:var(--warn)"></span>Modeled fallback';
+    badge.className='pill watch';
+    time.textContent='Live feed unavailable ('+e.message+') — using anchored June 2026 levels. Deploy with the /api function for live data.';
+  }
+}
+
+// ---------- WIRING ----------
+function bind(id,fn){const el=document.getElementById(id);el.addEventListener('input',()=>{fn(parseFloat(el.value));render();});}
+bind('boj',x=>{S.boj=x;document.getElementById('bojVal').textContent=x.toFixed(2)+'%';});
+bind('fed',x=>{S.fed=x;document.getElementById('fedVal').textContent=x.toFixed(2)+'%';});
+bind('fx', x=>{S.fx=x;document.getElementById('fxVal').textContent=x.toFixed(1);});
+document.getElementById('volSeg').addEventListener('click',e=>{
+  if(e.target.tagName!=='BUTTON')return;
+  [...e.currentTarget.children].forEach(b=>b.classList.remove('on'));
+  e.target.classList.add('on');
+  S.vol=parseFloat(e.target.dataset.v);render();
+});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  S={...LIVE};
+  document.getElementById('boj').value=LIVE.boj;document.getElementById('bojVal').textContent='1.00%';
+  document.getElementById('fed').value=LIVE.fed;document.getElementById('fedVal').textContent='3.63%';
+  document.getElementById('fx').value=Math.min(166,Math.max(150,LIVE.fx));document.getElementById('fxVal').textContent=LIVE.fx.toFixed(1);
+  [...document.getElementById('volSeg').children].forEach(b=>b.classList.toggle('on',b.dataset.v==='1.0'));
+  render();
+});
+document.getElementById('liveBtn').addEventListener('click',loadLive);
+
+initCharts();
+render();
+loadLive();
+</script>
+</body>
+</html>
